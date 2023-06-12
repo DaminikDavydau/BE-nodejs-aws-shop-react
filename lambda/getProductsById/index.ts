@@ -1,19 +1,48 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import AWS from 'aws-sdk';
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+const queryProduct = async (table: string, id: string) => {
+  const queryReults = await dynamodb.query({
+    TableName: table,
+    KeyConditionExpression: 'id = :id',
+    ExpressionAttributeValues: {':id': id}
+  }).promise()
+  return queryReults.Items
+}
+
+const queryStock = async (table: string, id: string) => {
+  const queryReults = await dynamodb.query({
+    TableName: table,
+    KeyConditionExpression: 'product_id = :id',
+    ExpressionAttributeValues: {':id': id}
+  }).promise()
+  return queryReults.Items
+}
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    // Mock data for the products array
-    const products = [
-      { id: '1', title: 'Milk', description: 'Some text', price: 3, count: 5 },
-      { id: '2', title: 'Bread', description: 'Some text', price: 6, count: 4 },
-      { id: '3', title: 'Eggs', description: 'Some text', price: 7, count: 3 },
-    ];
 
-    const productId = event.pathParameters?.productId;
+    console.log('Incoming request:', event);
 
-    const product = products.find((p) => p.id === productId);
+    const id = event.pathParameters?.productId;
+    if (!id) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Credentials': true,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*'
+        },
+        body: JSON.stringify({ message: 'Internal Server Error' }),
+      };
+    }    
+    
+    const product = await queryProduct(process.env.PRODUCTS_TABLE_NAME!, id);
+    const stock = await queryStock(process.env.STOCKS_TABLE_NAME!, id);
 
-    if (!product) {
+
+    if (!product![0] || !stock![0]) {
       return {
         statusCode: 404,
         headers: {
@@ -24,7 +53,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         body: JSON.stringify({ message: 'Product not found' }),
       };
     }
-
+    let result = {
+        ...product![0],
+        ...stock![0]
+    }
     return {
       statusCode: 200,
       headers: {
@@ -32,9 +64,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': '*'
       },
-      body: JSON.stringify(product),
+      body: JSON.stringify(result),
     };
   } catch (error) {
+    console.log('Error:', error);
+
     return {
       statusCode: 500,
       headers: {
