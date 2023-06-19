@@ -1,13 +1,38 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import * as AWS from 'aws-sdk';
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+
+const scan = async (table: any) => {
+  const scanReults = await dynamodb.scan({
+    TableName: table!,
+  }).promise();
+  return scanReults.Items
+}
+
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    // Mock data for the products array
-    const products = [
-      { id: '1', title: 'Milk', description: 'Some text', price: 3, count: 5 },
-      { id: '2', title: 'Bread', description: 'Some text', price: 6, count: 4 },
-      { id: '3', title: 'Eggs', description: 'Some text', price: 7, count: 3 },
-    ];
+
+    console.log('Incoming request:', event);
+    
+    const products = await scan(process.env.PRODUCTS_TABLE_NAME)
+    const stocks = await scan(process.env.STOCKS_TABLE_NAME);
+
+    const mergedList = products!.map((product) => {
+      const matchingStock = stocks!.find((stock) => stock.product_id === product.id);
+      if (matchingStock) {
+        return {
+          ...product,
+          count: matchingStock.count,
+        };
+      } else {
+        return {
+          ...product,
+          count: null,
+        }
+      }
+    });
 
     return {
       statusCode: 200,
@@ -16,9 +41,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': '*',
       },
-      body: JSON.stringify(products),
+      body: JSON.stringify(mergedList),
     };
   } catch (error) {
+    console.log('Error:', error);
+
     return {
       statusCode: 500,
       headers: {
