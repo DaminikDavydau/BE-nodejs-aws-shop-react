@@ -19,10 +19,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       Key: `uploaded/${name}`,
     });
 
-    signedUrl = signedUrl.split('?')[0];
-
-    signedUrl = signedUrl.split("/")[signedUrl.split("/").length - 2] + "/" + signedUrl.split("/")[signedUrl.split("/").length - 1]
-
     return {
       statusCode: 200,
       body: JSON.stringify({ signedUrl }),
