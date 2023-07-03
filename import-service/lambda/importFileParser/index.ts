@@ -1,46 +1,28 @@
-import { S3Event } from 'aws-lambda';
-import * as csvParser from 'csv-parser';
 import * as AWS from 'aws-sdk';
+import { S3Handler } from 'aws-lambda';
 
-const s3 = new AWS.S3();
+const sqs = new AWS.SQS();
 
-export const importFileParser = async (event: S3Event): Promise<void> => {
-  const bucketName = event.Records[0].s3.bucket.name;
-  const objectKey = event.Records[0].s3.object.key;
+export const importFileParser: S3Handler = async (event) => {
+  try {
+    const s3Records = event.Records;
+    const queueUrl = 'https://sqs.eu-west-1.amazonaws.com/960150701114/BeNodejsAwsShopReactStack-CatalogItemsQueueB3B6CE23-HRwgCvMRNnWG';
 
-  const s3Stream = s3
-    .getObject({
-      Bucket: bucketName,
-      Key: objectKey,
-    })
-    .createReadStream();
+    for (const record of s3Records) {
+      const s3ObjectKey = record.s3.object.key;
+      const params = {
+        MessageBody: JSON.stringify({ s3ObjectKey }),
+        QueueUrl: queueUrl,
+      };
 
-  s3Stream
-    .pipe(csvParser())
-    .on('data', (data: any) => {
-      console.log('Record:', data);
-    })
-    .on('error', (error: any) => {
-      console.error('Error:', error);
-    })
-    .on('end', async () => {
-      try {
-        await s3
-          .copyObject({
-            Bucket: bucketName,
-            CopySource: `${bucketName}/${objectKey}`,
-            Key: objectKey.replace('uploaded', 'parsed'),
-          })
-          .promise();
+      await sqs.sendMessage(params).promise();
 
-        await s3
-          .deleteObject({
-            Bucket: bucketName,
-            Key: objectKey,
-          })
-          .promise();
-      } catch (error) {
-        console.error('Error while moving the file:', error);
-      }
-    });
+      console.log(`Sent message to SQS for object: ${s3ObjectKey}`);
+    }
+
+    console.log('All records sent to SQS successfully');
+  } catch (error) {
+    console.error('Error processing import file:', error);
+    throw error;
+  }
 };
