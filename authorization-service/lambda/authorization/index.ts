@@ -14,7 +14,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const decodedCredentials = Buffer.from(encodedCredentials, 'base64').toString('utf-8');
   
     const [username, password] = decodedCredentials.split(':');
-    const storedPassword = process.env.GitPassword; // Replace with the environment variable for your GitHub account login
+    const storedPassword = process.env.GitPassword;
   
     if (username !== 'daminikdavydau' || password !== storedPassword) {
       return {
