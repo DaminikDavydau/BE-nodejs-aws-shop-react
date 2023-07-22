@@ -9,12 +9,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.all('/*', (req, res) => {
-  console.log('originalUrl', req.originalUrl); // /products/main?res=all console.log('body', req.body); // { name: 'product-1', count: '12' }
-  console.log('method', req.method); // POST, GET
   const recipient = req.originalUrl.split('/')[1]; 
-  console.log('recipient', recipient);
   const recipientURL = process.env[`${recipient.toUpperCase()}_SERVICE_URL`]; 
-  console.log('recipientURL', recipientURL);
 
   const url = `${recipientURL}${req.originalUrl.slice(recipient.length+1)}`;
 
@@ -23,7 +19,6 @@ app.all('/*', (req, res) => {
   const cachedResponse = cache.get(cacheKey);
 
   if (cachedResponse) {
-    console.log('Response from cache');
     return res.status(cachedResponse.status).json(cachedResponse.data);
   }
 
@@ -34,16 +29,13 @@ app.all('/*', (req, res) => {
       ...(Object.keys(req.body || {}).length > 0 && {data: req.body})
     };
     
-    console.log('axiosConfig: ', axiosConfig);
     
     axios (axiosConfig)
     .then(function (response) {
-      console.log('response from recipient', response.data); 
       cache.set(cacheKey, { status: response.status, data: response.data }); // cachhe data
       res.json(response.data);
     })
     .catch(error => {
-      console.log('some error:', JSON.stringify(error));
       if(error.response) {
         const {
           status,
