@@ -4,6 +4,7 @@ const NodeCache = require('node-cache');
 require('dotenv').config();
 
 const app = express();
+const cache = new NodeCache({ stdTTL: 120 }); // Cache with 2-minute expiration
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -17,6 +18,15 @@ app.all('/*', (req, res) => {
 
   const url = `${recipientURL}${req.originalUrl.slice(recipient.length+1)}`;
 
+  // Check if the request is already cached
+  const cacheKey = `${req.method}:${url}:${JSON.stringify(req.body)}`;
+  const cachedResponse = cache.get(cacheKey);
+
+  if (cachedResponse) {
+    console.log('Response from cache');
+    return res.status(cachedResponse.status).json(cachedResponse.data);
+  }
+
   if(recipientURL) {
     const axiosConfig = {
       method: req.method,
@@ -29,6 +39,7 @@ app.all('/*', (req, res) => {
     axios (axiosConfig)
     .then(function (response) {
       console.log('response from recipient', response.data); 
+      cache.set(cacheKey, { status: response.status, data: response.data }); // cachhe data
       res.json(response.data);
     })
     .catch(error => {
